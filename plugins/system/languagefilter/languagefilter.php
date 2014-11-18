@@ -9,6 +9,8 @@
 
 defined('_JEXEC') or die;
 
+use Joomla\Registry\Registry;
+
 JLoader::register('MenusHelper', JPATH_ADMINISTRATOR . '/components/com_menus/helpers/menus.php');
 
 JLoader::register('MultilangstatusHelper', JPATH_ADMINISTRATOR . '/components/com_languages/helpers/multilangstatus.php');
@@ -16,9 +18,7 @@ JLoader::register('MultilangstatusHelper', JPATH_ADMINISTRATOR . '/components/co
 /**
  * Joomla! Language Filter Plugin.
  *
- * @package     Joomla.Plugin
- * @subpackage  System.languagefilter
- * @since       1.6
+ * @since  1.6
  */
 class PlgSystemLanguageFilter extends JPlugin
 {
@@ -68,7 +68,7 @@ class PlgSystemLanguageFilter extends JPlugin
 				self::$lang_codes 	= JLanguageHelper::getLanguages('lang_code');
 				self::$default_lang = JComponentHelper::getParams('com_languages')->get('site', 'en-GB');
 				self::$default_sef 	= self::$lang_codes[self::$default_lang]->sef;
-				self::$homes		= MultilangstatusHelper::getHomes();
+				self::$homes		= MultilangstatusHelper::getHomepages();
 
 				$user = JFactory::getUser();
 				$levels = $user->getAuthorisedViewLevels();
@@ -116,8 +116,8 @@ class PlgSystemLanguageFilter extends JPlugin
 
 					// Create a cookie.
 					$conf = JFactory::getConfig();
-					$cookie_domain 	= $conf->get('config.cookie_domain', '');
-					$cookie_path 	= $conf->get('config.cookie_path', '/');
+					$cookie_domain 	= $conf->get('cookie_domain', '');
+					$cookie_path 	= $conf->get('cookie_path', '/');
 					setcookie(JApplication::getHash('language'), $lang_code, $this->getLangCookieTime(), $cookie_path, $cookie_domain);
 					$app->input->cookie->set(JApplication::getHash('language'), $lang_code);
 
@@ -299,7 +299,7 @@ class PlgSystemLanguageFilter extends JPlugin
 			$sef = $parts[0];
 
 			// Redirect only if not in post.
-			if (!empty($lang_code) && ($app->input->getMethod() != "POST" || count($app->input->post) == 0))
+			if (!empty($lang_code) && ($app->input->getMethod() != "POST" || (count($app->input->post) == 0 && count($app->input->files) == 0)))
 			{
 				if ($this->params->get('remove_default_prefix', 0) == 0)
 				{
@@ -310,7 +310,7 @@ class PlgSystemLanguageFilter extends JPlugin
 						$sef = isset(self::$lang_codes[$lang_code]) ? self::$lang_codes[$lang_code]->sef : self::$default_sef;
 						$uri->setPath($sef . '/' . $path);
 
-						if ($app->getCfg('sef_rewrite'))
+						if ($app->get('sef_rewrite'))
 						{
 							$app->redirect($uri->base() . $uri->toString(array('path', 'query', 'fragment')));
 						}
@@ -329,7 +329,7 @@ class PlgSystemLanguageFilter extends JPlugin
 						$sef = isset(self::$lang_codes[$lang_code]) && empty($path) ? self::$lang_codes[$lang_code]->sef : self::$default_sef;
 						$uri->setPath($sef . '/' . $path);
 
-						if ($app->getCfg('sef_rewrite'))
+						if ($app->get('sef_rewrite'))
 						{
 							$app->redirect($uri->base() . $uri->toString(array('path', 'query', 'fragment')));
 						}
@@ -348,7 +348,7 @@ class PlgSystemLanguageFilter extends JPlugin
 						array_shift($parts);
 						$uri->setPath(implode('/', $parts));
 
-						if ($app->getCfg('sef_rewrite'))
+						if ($app->get('sef_rewrite'))
 						{
 							$app->redirect($uri->base() . $uri->toString(array('path', 'query', 'fragment')));
 						}
@@ -407,7 +407,7 @@ class PlgSystemLanguageFilter extends JPlugin
 	{
 		if ($this->params->get('automatic_change', '1') == '1' && key_exists('params', $user))
 		{
-			$registry = new JRegistry;
+			$registry = new Registry;
 			$registry->loadString($user['params']);
 			self::$user_lang_code = $registry->get('language');
 
@@ -436,7 +436,7 @@ class PlgSystemLanguageFilter extends JPlugin
 	{
 		if ($this->params->get('automatic_change', '1') == '1' && key_exists('params', $user) && $success)
 		{
-			$registry = new JRegistry;
+			$registry = new Registry;
 			$registry->loadString($user['params']);
 			$lang_code = $registry->get('language');
 
@@ -465,8 +465,8 @@ class PlgSystemLanguageFilter extends JPlugin
 
 					// Create a cookie.
 					$conf = JFactory::getConfig();
-					$cookie_domain 	= $conf->get('config.cookie_domain', '');
-					$cookie_path 	= $conf->get('config.cookie_path', '/');
+					$cookie_domain 	= $conf->get('cookie_domain', '');
+					$cookie_path 	= $conf->get('cookie_path', '/');
 					setcookie(JApplication::getHash('language'), $lang_code, $this->getLangCookieTime(), $cookie_path, $cookie_domain);
 				}
 			}
@@ -517,8 +517,8 @@ class PlgSystemLanguageFilter extends JPlugin
 
 				// Create a cookie.
 				$conf = JFactory::getConfig();
-				$cookie_domain 	= $conf->get('config.cookie_domain', '');
-				$cookie_path 	= $conf->get('config.cookie_path', '/');
+				$cookie_domain 	= $conf->get('cookie_domain', '');
+				$cookie_path 	= $conf->get('cookie_path', '/');
 				setcookie(JApplication::getHash('language'), $lang_code, $this->getLangCookieTime(), $cookie_path, $cookie_domain);
 
 				// Change the language code.
@@ -564,7 +564,7 @@ class PlgSystemLanguageFilter extends JPlugin
 			if ($active)
 			{
 				// Get menu item link.
-				if ($app->getCfg('sef'))
+				if ($app->get('sef'))
 				{
 					$active_link = JRoute::_('index.php?Itemid=' . $active->id, false);
 				}
@@ -633,6 +633,13 @@ class PlgSystemLanguageFilter extends JPlugin
 					if (isset($cassociations[$language->lang_code]))
 					{
 						$link = JRoute::_($cassociations[$language->lang_code] . '&lang=' . $language->sef);
+
+						// Check if language is the default site language and remove url language code is on
+						if ($language->sef == self::$default_sef && $this->params->get('remove_default_prefix') == '1')
+						{
+							$link = preg_replace('|/' . $language->sef . '/|', '/', $link, 1);
+						}
+
 						$doc->addHeadLink($server . $link, 'alternate', 'rel', array('hreflang' => $language->lang_code));
 					}
 					elseif (isset($associations[$language->lang_code]))
@@ -641,13 +648,19 @@ class PlgSystemLanguageFilter extends JPlugin
 
 						if ($item)
 						{
-							if ($app->getCfg('sef'))
+							if ($app->get('sef'))
 							{
 								$link = JRoute::_('index.php?Itemid=' . $item->id . '&lang=' . $language->sef);
 							}
 							else
 							{
 								$link = JRoute::_($item->link . '&Itemid=' . $item->id . '&lang=' . $language->sef);
+							}
+
+							// Check if language is the default site language and remove url language code is on
+							if ($language->sef == self::$default_sef && $this->params->get('remove_default_prefix') == '1')
+							{
+								$link = preg_replace('|/' . $language->sef . '/|', '/', $link, 1);
 							}
 
 							$doc->addHeadLink($server . $link, 'alternate', 'rel', array('hreflang' => $language->lang_code));
@@ -669,13 +682,19 @@ class PlgSystemLanguageFilter extends JPlugin
 
 					if ($item && $item->language != $active->language && $item->language != '*')
 					{
-						if ($app->getCfg('sef'))
+						if ($app->get('sef'))
 						{
 							$link = JRoute::_('index.php?Itemid=' . $item->id . '&lang=' . $language->sef);
 						}
 						else
 						{
 							$link = JRoute::_($item->link . '&Itemid=' . $item->id . '&lang=' . $language->sef);
+						}
+
+						// Check if language is the default site language and remove url language code is on
+						if ($language->sef == self::$default_sef && $this->params->get('remove_default_prefix') == '1')
+						{
+							$link = preg_replace('|/' . $language->sef . '/|', '/', $link, 1);
 						}
 
 						$doc->addHeadLink($server . $link, 'alternate', 'rel', array('hreflang' => $language->lang_code));

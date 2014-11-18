@@ -63,7 +63,6 @@ class JFormFieldCategoryEdit extends JFormFieldList
 		}
 
 		$db = JFactory::getDbo();
-
 		$query = $db->getQuery(true)
 			->select('DISTINCT a.id AS value, a.title AS text, a.level, a.published');
 
@@ -98,8 +97,7 @@ class JFormFieldCategoryEdit extends JFormFieldList
 			$subQuery->where('published IN (' . implode(',', $published) . ')');
 		}
 
-		$subQuery->group('id, title, level, lft, rgt, extension, parent_id,published')
-			->order('lft ASC');
+		$subQuery->order('lft ASC');
 		$query->from('(' . $subQuery->__toString() . ') AS a')
 			->join('LEFT', $db->quoteName('#__categories') . ' AS b ON a.lft > b.lft AND a.rgt < b.rgt');
 
@@ -128,7 +126,7 @@ class JFormFieldCategoryEdit extends JFormFieldList
 		}
 		catch (RuntimeException $e)
 		{
-			JError::raiseWarning(500, $e->getMessage);
+			JError::raiseWarning(500, $e->getMessage());
 		}
 
 		// Pad the option text with spaces using depth level as a multiplier.
@@ -161,10 +159,11 @@ class JFormFieldCategoryEdit extends JFormFieldList
 		{
 			foreach ($options as $i => $option)
 			{
-				// To take save or create in a category you need to have create rights for that category
-				// unless the item is already in that category.
-				// Unset the option if the user isn't authorised for it. In this field assets are always categories.
-				if ($user->authorise('core.create', $extension . '.category.' . $option->value) != true)
+				/* To take save or create in a category you need to have create rights for that category
+				 * unless the item is already in that category.
+				 * Unset the option if the user isn't authorised for it. In this field assets are always categories.
+				 */
+				if ($user->authorise('core.create', $extension . '.category.' . $option->value) != true && $option->level != 0)
 				{
 					unset($options[$i]);
 				}
@@ -173,9 +172,10 @@ class JFormFieldCategoryEdit extends JFormFieldList
 		// If you have an existing category id things are more complex.
 		else
 		{
-			// If you are only allowed to edit in this category but not edit.state, you should not get any
-			// option to change the category parent for a category or the category for a content item,
-			// but you should be able to save in that category.
+			/* If you are only allowed to edit in this category but not edit.state, you should not get any
+			 * option to change the category parent for a category or the category for a content item,
+			 * but you should be able to save in that category.
+			 */
 			foreach ($options as $i => $option)
 			{
 				if ($user->authorise('core.edit.state', $extension . '.category.' . $oldCat) != true && !isset($oldParent))
